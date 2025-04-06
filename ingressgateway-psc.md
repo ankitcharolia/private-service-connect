@@ -107,6 +107,79 @@ spec:
        --target-service-attachment=projects/gcp-stage/regions/europe-west3/serviceAttachments/istio-ingressgateway-private
 ```
 
-### 
+### Create a Kubernetes Service to represent the PSC endpoint to PLAY's Istio ingress gateway
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: play-istio-gateway
+  namespace: default
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 443
+    protocol: TCP
+    name: https
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: play-istio-gateway
+  namespace: default
+subsets:
+- addresses:
+  - ip: ENDPOINT_IP_ADDRESS  # Replace with the endpoint-istio-ingressgateway-private-ip value
+  ports:
+  - port: 80
+    name: http
+  - port: 443
+    name: https
+```
 
+### Create VirtualServices to route traffic to different services in PLAY cluster
+```yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: play-whereami
+  namespace: default
+spec:
+  hosts:
+  - "whereami.example.com"  # Host used to access the whereami service
+  gateways:
+  - istio-ingress-private/gateway  # The gateway in your STAGE cluster
+  http:
+  - route:
+    - destination:
+        host: play-istio-gateway  # The service we created to represent the PSC endpoint
+        port:
+          number: 80
+```
+
+### Example of accessing another service in PLAY cluster
+```yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: play-another-service
+  namespace: default
+spec:
+  hosts:
+  - "another-service.example.com"  # Different hostname for a different service
+  gateways:
+  - istio-ingress-private/gateway
+  http:
+  - route:
+    - destination:
+        host: play-istio-gateway
+        port:
+          number: 80
+```
+
+## References
 * [PSC Example](https://codelabs.developers.google.com/cloudnet-psc-ilb-gke#0)
