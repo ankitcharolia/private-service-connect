@@ -6,98 +6,45 @@
 ## PLAY GKE CLUSTER (Service Producer)
 ### Create a subnet for Private Service Connect 
 ```shell
+# You cannot use the same subnet in multiple service attachment configurations.
 gcloud compute networks subnets create psc-wherami-subnetwork \
-    --project gcp-test \
-    --network test-vpc \
+    --project gcp-play \
+    --network play-vpc-network \
     --region europe-west3 \
-    --range 10.10.10.8/30 \
+    --range 10.10.10.0/29 \
     --purpose PRIVATE_SERVICE_CONNECT
 ```
 
 ### Deploy a `whereami` service
 ```shell
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: whereami
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: whereami
-  template:
-    metadata:
-      labels:
-        app: whereami
-    spec:
-      containers:
-      - name: whereami
-        image: gcr.io/google-samples/whereami:v1.2.24
-        ports:
-          - name: http
-            containerPort: 8080
-        readinessProbe:
-          httpGet:
-            path: /healthz
-            port: 8080
-            scheme: HTTP
-          initialDelaySeconds: 5
-          timeoutSeconds: 1
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: whereami
-  annotations:
-    networking.gke.io/load-balancer-type: "Internal"
-spec:
-  type: LoadBalancer
-  selector:
-    app: whereami
-  ports:
-  - port: 80
-    targetPort: 8080
-    protocol: TCP
+kubectl apply -f workload-whereami.yaml
 ```
 
 ### Create ServiceAttachment
-```yaml
-apiVersion: networking.gke.io/v1
-kind: ServiceAttachment
-metadata:
- name: whereami
- namespace: default
-spec:
- connectionPreference: ACCEPT_MANUAL
- # psc subnet name
- natSubnets:
- - psc-wherami-subnetwork
- proxyProtocol: false
- resourceRef:
-   kind: Service
-   name: whereami
+```shell
+kubectl apply -f workload-serviceattachment.yaml
 ```
 
 ## STAGE GKE CLUSTER (Service Consumer)
 ### craete an ENDPOINT IP address at the consumer side for each PSC connection
 **NOTE:** This enpoint IP address receives the traffic and route it to published service on Service Producer side via PSC subnet on Producer side 
 ```shell
-   gcloud compute addresses create endpoint-wherami-ip \
-       --project=gcp-stage \
-       --region=europe-west3 \
-       --subnet=kube-subnetwork \
-       --purpose=GCE_ENDPOINT
+gcloud compute addresses create endpoint-wherami-ip \
+    --project=gcp-stage \
+    --region=europe-west3 \
+    --subnet=stage-kube-subnetwork \
+    --purpose=GCE_ENDPOINT
 ```
 
 ### create a forwarding rule
 ```shell
-   gcloud compute forwarding-rules create psc-whereami \
-       --project=gcp-stage \
-       --region=europe-west3 \
-       --network=stage-vpc \
-       --subnet=kube-subnetwork \
-       --address=endpoint-wherami-ip \
-       --target-service-attachment=projects/gcp-stage/regions/europe-west3/serviceAttachments/whereami
+gcloud compute forwarding-rules create psc-whereami \
+    --project=gcp-stage \
+    --region=europe-west3 \
+    --network=stage-vpc-network \
+    --subnet=stage-kube-subnetwork \
+    --address=endpoint-wherami-ip \
+    --target-service-attachment=projects/gcp-play/regions/europe-west3/serviceAttachments/whereami-<randomid>
 ```
 
 ### create virtualservice to access a workload running in PLAY using STAGE CLUSTER virtualservcie
@@ -119,7 +66,7 @@ spec:
 apiVersion: v1
 kind: Endpoints
 metadata:
-  name: play-whereami
+  name: play-whereami # Name should match with service name
   namespace: default
 subsets:
 - addresses:
@@ -140,7 +87,7 @@ spec:
   hosts:
   - "whereami.example.com"
   gateways:
-  - istio-ingress-private/gateway
+  - istio-ingressgateway-private/istio-gateway
   http:
   - route:
     - destination:

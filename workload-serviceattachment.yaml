@@ -1,0 +1,15 @@
+# serviceattachment for whereami service
+apiVersion: networking.gke.io/v1
+kind: ServiceAttachment
+metadata:
+ name: whereami
+ namespace: default
+spec:
+ connectionPreference: ACCEPT_MANUAL
+ # psc subnet name
+ natSubnets:
+ - psc-wherami-subnetwork
+ proxyProtocol: false
+ resourceRef:
+   kind: Service
+   name: whereami
