@@ -1,0 +1,68 @@
+## STAGE - CONSUMER CLUSTER
+apiVersion: v1
+kind: Service
+metadata:
+  name: play-istio-ingressgateway-private
+  namespace: default
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 443
+    protocol: TCP
+    name: https
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: play-istio-ingressgateway-private
+  namespace: default
+subsets:
+- addresses:
+  - ip: 10.0.0.75  # Replace with the istio-ingressgateway-private-endpoint-ip value
+  ports:
+  - port: 80
+    name: http
+  - port: 443
+    name: https
+
+
+# IT WORKS!!!
+## Option-1
+# curl -sH "HOST: whereami.play.fff.private" http://10.0.0.75 | jq .
+# {
+#   "cluster_name": "play-cluster",
+#   "gce_instance_id": "8599391477442547944",
+#   "gce_service_account": "fff-play.svc.id.goog",
+#   "host_header": "whereami.play.fff.private",
+#   "pod_name": "whereami-7484959bf6-z5pjw",
+#   "pod_name_emoji": "👩🏼‍🔧",
+#   "project_id": "fff-play",
+#   "timestamp": "2025-04-12T23:11:46",
+#   "zone": "europe-west3-b"
+# }
+
+## Option-2
+# Use a hostAlias in your Container spec
+# spec:
+#   hostAliases:
+#   - ip: "10.0.0.75"
+#     hostnames:
+#     - "whereami.fff.private"
+
+## Option-3
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: coredns-custom
+#   namespace: kube-system
+# data:
+#   play-fff-private.server: |
+#     play.fff.private:53 {
+#       rewrite name regex (.*)\.play\.fff\.private play-istio-ingressgateway-private.default.svc.cluster.local
+#       forward . /etc/resolv.conf
+#     }

@@ -2,11 +2,11 @@
 
 ![Private Service Connect Architecture](./images/PSC.png "Private Service Connect Architecture")
 
-
 ## PLAY GKE CLUSTER (Service Producer)
 ### Create a subnet for Private Service Connect 
 ```shell
 # You cannot use the same subnet in multiple service attachment configurations.
+# find the correct IP cidr range here: https://mxtoolbox.com/subnetcalculator.aspx
 gcloud compute networks subnets create psc-wherami-subnetwork \
     --project gcp-play \
     --network play-vpc-network \
@@ -29,6 +29,8 @@ kubectl apply -f workload-serviceattachment.yaml
 ### craete an ENDPOINT IP address at the consumer side for each PSC connection
 **NOTE:** This enpoint IP address receives the traffic and route it to published service on Service Producer side via PSC subnet on Producer side 
 ```shell
+# You cannot use the same subnet in multiple service attachment configurations.
+# find the correct IP cidr range
 gcloud compute addresses create endpoint-wherami-ip \
     --project=gcp-stage \
     --region=europe-west3 \
@@ -85,9 +87,10 @@ metadata:
   namespace: default
 spec:
   hosts:
-  - "whereami.example.com"
+  - "whereami.stage.fff.services"
   gateways:
-  - istio-ingressgateway-private/istio-gateway
+  - istio-ingress/istio-gateway
+  # - istio-ingress-private/istio-gateway
   http:
   - route:
     - destination:

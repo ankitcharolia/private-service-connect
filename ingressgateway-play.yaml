@@ -1,0 +1,92 @@
+## PLAY - PRODUCER CLUSTER
+# serviceattachemnt for istio-ingressgateway-private service
+apiVersion: networking.gke.io/v1
+kind: ServiceAttachment
+metadata:
+ name: istio-ingressgateway-private
+ namespace: istio-ingress-private
+spec:
+ connectionPreference: ACCEPT_MANUAL
+ # psc subnet name
+ natSubnets:
+ - psc-istio-ingressgateway-private
+ proxyProtocol: false
+ resourceRef:
+   kind: Service
+   name: istio-ingressgateway-private
+
+---
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: istio-gateway
+  namespace: istio-ingress-private
+spec:
+  selector:
+    app: istio-ingressgateway-private
+    istio: ingressgateway-private
+  servers:
+  - hosts:
+    - play.fff.private
+    - '*.play.fff.private'
+    port:
+      name: http
+      number: 80
+      protocol: HTTP
+
+---
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: istio-gateway
+  namespace: istio-ingress
+spec:
+  selector:
+    app: istio-ingressgateway
+    istio: ingressgateway
+  servers:
+  - hosts:
+    - play.fff.services
+    - '*.play.fff.service'
+    port:
+      name: https
+      number: 443
+      protocol: HTTPS
+    tls:
+      credentialName: gateway-secret-tls
+      mode: SIMPLE
+  - hosts:
+    - play.fff.services
+    - '*.play.fff.services'
+    port:
+      name: http
+      number: 80
+      protocol: HTTP
+    tls:
+      httpsRedirect: true
+
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: whereami
+  namespace: default
+spec:
+  hosts:
+  - "whereami.play.fff.private"
+  - "whereami.play.fff.services"
+  gateways:
+  - istio-ingress-private/istio-gateway
+  - istio-ingress/istio-gateway
+  http:
+  - route:
+    - destination:
+        host: whereami
+        port:
+          number: 80
+
+# CHECK FROM THE PRODUCER CLUSTER
+# I can access whereami service using both istio-ingressgateway and istio-ingressgateway-private
+# curl -v http://whereami.play.fff.services
+# curl -H "HOST: whereami.play.fff.private" http://10.0.0.65 (istio-ingressgateway-private LB IP)
+# {"cluster_name":"play-cluster","gce_instance_id":"8599391477442547944","gce_service_account":"fff-play.svc.id.goog","host_header":"whereami.play.fff.private","pod_name":"whereami-7484959bf6-4pvt2","pod_name_emoji":"\ud83e\uddce\ud83c\udfff\u200d\u2642\ufe0f\u200d\u27a1","project_id":"fff-play","timestamp":"2025-04-12T21:33:05","zone":"europe-west3-b"}
