@@ -52,7 +52,7 @@ subsets:
 #   hostAliases:
 #   - ip: "10.0.0.75"
 #     hostnames:
-#     - "whereami.fff.private"
+#     - "whereami.play.fff.private"
 
 ## Option-3
 # apiVersion: v1
